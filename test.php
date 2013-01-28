@@ -9,8 +9,8 @@ require "rwDocument.php";
 
 $rwfile = new rwDocument();
 
-$content = $rwfile->read("/home/chliny/Desktop/统计的网站.docx");
-
+$content = $rwfile->read("/home/chliny/network.zip");
 var_dump($content);
 echo "\n";
+
 ?>

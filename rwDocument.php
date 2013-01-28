@@ -4,51 +4,34 @@
  Author: chliny
  mail: chliny11@gmail.com
  Created Time: 2013年01月27日 星期日 12时51分20秒
- ************************************************************************/
+************************************************************************/
 /*
  * depends on xpdf catdoc
  */
 class rwDocument{
-    /*
-     * the path of the file to be readed or written
-     */
-    private $file;
 
-    /*
-     * $file escapeshellarg
-     */
-    private $escapeFile;
-
-    /*
-     * the content in the file
-     */
-    public $content;
-
-    /*
-     * the type of the file
-     */
-    private $type;
-
-    /*
-     * initiates a new rwDocument 
-     */
     public function __construct(){
-        
+
     }
-        
+
+    public function __destruct(){
+        $command = 'rm -rf /tmp/rwDocument/*';
+        exec($command);
+    }
+
     /*
      * get the type of the file
      */
-    private function getFileType(){
-        if(empty($this->file)){
+    private function getFileType($escapeFile){
+        if(empty($escapeFile)){
             echo "ERROR:no file input!\n";
             exit;
         }
-        $command = "file -i $this->escapeFile";
+        $command = "file -i $escapeFile";
         $fileMime = exec($command);
         $matches =  array();
         preg_match('/: ((\w|\/)*?);/',$fileMime,$matches);
-        $this->type = $matches[1];
+        return $matches[1];
     }
 
     /*
@@ -57,87 +40,114 @@ class rwDocument{
      * @operation: read or write
      * @return the content of the file
      */
-    public function read($inputPath){
-        $this->file = $inputPath;
-        $this->escapeFile = escapeshellarg($inputPath);
-        if(empty($this->type))
-            $this->getFileType();
-
-        if($this->type == "application/pdf"){
-            $this->readPDF();
-        }else if($this->type == "application/msword"){
-            $this->readWord();
-        }else if($this->type == "application/zip"){
-            $this->readZIP();
+    public function read($file,$type=NULL){
+        if(empty($type))
+            $type = $this->getFileType($file);
+        $content;
+        if($type == "application/pdf"){
+            $content = $this->readPDF($file);
+        }else if($type == "application/msword"){
+            $content = $this->readWord($file);
+        }else if($type == "application/zip"){
+            $content = $this->readZIP($file);
         }
 
-        return $this->content;   
+        return $content;   
     }
 
     /*
      * read ms word document;
      */
-    private function readWord(){
-        $fileArr = explode('.',$this->file);
+    private function readWord($file){
+        $fileArr = explode('.',$file);
         $suffix = $fileArr[1];
         $suffix = trim($suffix);
+        $content;
         if($suffix == "doc"){
-            $this->readDOC();
+            $content = $this->readDOC($file);
         }else if($suffix == "docx"){
-            $this->readDOCX();
+            $content = $this->readDOCX($file);
         }else{
             echo "could mot confirm the document!\n";
             exit;
         }
+        return $content;
     }
 
     /*
      * read ms word with DOC suffix
      */
-    private function readDOC(){
-        $command = "catdoc $this->escapeFile";
-        $this->writeContent($command);
-
+    private function readDOC($file){
+        $escapeFile = escapeshellarg($file);
+        $command = "catdoc $escapeFile";
+        return $this->writeContent($command);
     }
 
     /* 
      * read ms word with DOCX suffix
      */
-    private function readDOCX(){
-        $this->readZIP();
-        $this->content = $this->content['word/document.xml']; 
-        $this->content = preg_replace('/\<\/w\:p\>/',"\n",$this->content);
-        $this->content = strip_tags($this->content,"\n");
+    private function readDOCX($file){
+        $docxZip = new ZipArchive;
+        $docxZipRes = $docxZip->open($file);
+        if($docxZipRes === true){
+            $content = $docxZip->getFromName('word/document.xml');     
+            $content = preg_replace('/\<\/w\:p\>/',"\n",$content);
+            $content = strip_tags($content,"\n");
+            $docxZip->close($file);
+        }else{
+            echo "ERROR: $docxZipRes\n";
+            exit;
+        }
+        return $content;
     }
 
     /*
      * read zip document
      */
-    private function readZIP(){
+    private function readZIP($file){
         $zip = new ZipArchive;
-        $zipRes = $zip->open($this->file);
+        $zipRes = $zip->open($file);
+        $thisContent;
         if($zipRes === true){
-            $index = 0;
             $zipLen = $zip->numFiles;
-            for(;$index < $zipLen;++$index){
+            for($index=0;$index < $zipLen;++$index){
                 $zipStat = $zip->statIndex($index);
                 if($zipStat['comp_method'] == 0) //dir
                     continue;
+
                 $name = $zipStat['name'];
-                $this->content[$name] = $zip->getFromIndex($index);
+                if(preg_match('/\.pdf|\.doc|\.xls\.xlsx/i',$name) > 0){
+                    $extract = $zip->extractTo('/tmp/rwDocument/',$name);
+                    $thisFile = "/tmp/rwDocument/$name";
+                    $content = $this->read($thisFile);
+                    $thisContent[$name] = $content;
+
+                    if(preg_match('/\.docx/',$name) > 0){
+                        ++$index;
+                        $zipStat = $zip->statIndex($index);
+                        while(preg_match('/\.xml|\.rels/',$zipStat['name']) > 0){
+                            ++$index;
+                            $zipStat = $zip->statIndex($index);
+                        }
+                        --$index;
+                    }
+                }else
+                    $thisContent[$name] = $zip->getFromIndex($index);
             }
             $zip->close();
         }else{
-            echo "ERROR:" . $zipRes . "\n";
+            echo "ERROR: $zipRes\n";
             exit;
         }
+        return $thisContent;
     }
 
     /*
      * read PDF document
      */
-    private function readPDF(){
-        $command = "pdftotext $this->escapeFile -";
+    private function readPDF($file){
+        $escapeFile = escapeshellarg($file);
+        $command = "pdftotext $escapeFile -";
         $this->writeContent($command);
     }
 
@@ -147,7 +157,8 @@ class rwDocument{
     private function writeContent($command){
         $output = array();
         exec($command,$output);
-        $this->content = implode("\n",$output);
+        $content = implode("\n",$output);
+        return $content;
     }
 }
 
