@@ -9,7 +9,8 @@ require "rwDocument.php";
 
 $rwfile = new rwDocument();
 
-$content = $rwfile->read("/home/chliny/study/Linux/Linux_CPU_Usage_Analysis.pdf");
+$content = $rwfile->read("/home/chliny/Desktop/统计的网站.docx");
 
-echo $content . "\n";
+var_dump($content);
+echo "\n";
 ?>
