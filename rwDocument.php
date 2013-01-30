@@ -50,9 +50,52 @@ class rwDocument{
             $content = $this->readWord($file);
         }else if($type == "application/zip"){
             $content = $this->readZIP($file);
+        }else if($type == "inode/directory"){
+            $content = $this->readDIR($file);
+        }else if($type == "text/plain"){
+            $content = $this->readTXT($file);
         }
 
+
         return $content;   
+    }
+
+
+    /*
+    * read txt document
+    */
+    private function readTXT($file){
+        $content = file_get_contents($file);
+        return $content;
+    }
+        
+
+    /*
+     * read document in the directory
+     */
+    private function readDIR($file){
+        $file = trim($file);
+        if($file[strlen($file)-1] != '/'){
+            $file .= '/';
+        }
+        $dir = opendir($file);
+        $content;
+        while(false !== ($document = readdir($dir))){
+            if($document[0] == '.')
+                continue;
+            $name = $file . $document;
+            $result  = $this->read($name);
+            /*if(is_array($result)){
+                foreach($result as $reName => $reDocu){
+                    $content[$document . '/' . $reName] = $result;
+                }
+            }else{
+                $content[$document] = $result;
+            }*/
+            $content[$document] = $result;
+        }
+        closedir($dir);
+        return $content;
     }
 
     /*
