@@ -85,13 +85,7 @@ class rwDocument{
                 continue;
             $name = $file . $document;
             $result  = $this->read($name);
-            /*if(is_array($result)){
-                foreach($result as $reName => $reDocu){
-                    $content[$document . '/' . $reName] = $result;
-                }
-            }else{
-                $content[$document] = $result;
-            }*/
+            
             $content[$document] = $result;
         }
         closedir($dir);
@@ -150,7 +144,7 @@ class rwDocument{
     private function readZIP($file){
         $zip = new ZipArchive;
         $zipRes = $zip->open($file);
-        $thisContent;
+        $thisContent = array();
         if($zipRes === true){
             $zipLen = $zip->numFiles;
             for($index=0;$index < $zipLen;++$index){
@@ -174,15 +168,37 @@ class rwDocument{
                         }
                         --$index;
                     }
-                }else
-                    $thisContent[$name] = $zip->getFromIndex($index);
+                }else{
+                    $thisContent[$name] = $zip->getFromIndex($index); 
+                }
             }
             $zip->close();
         }else{
             echo "ERROR: $zipRes\n";
             exit;
         }
-        return $thisContent;
+        return $this->zipStandize($thisContent);
+    }
+
+    /*
+     * standize the output_of zip content
+     */
+    private function zipStandize($content){
+        $result = array();
+        foreach($content as $name => $value){
+            $nameArr = explode('/',$name);
+            $len = count($nameArr);
+            $i = $len-1;
+            $temp = array();
+            $temp[$nameArr[$i--]] = $value;
+            while($i>=0){
+                $temp2 = $temp;
+                $temp = array();
+                $temp[$nameArr[$i--]] = $temp2;
+            }
+            $result = array_merge_recursive($result,$temp);
+        }
+        return $result;
     }
 
     /*
