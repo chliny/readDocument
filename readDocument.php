@@ -8,7 +8,7 @@
 /*
  * depends on xpdf catdoc
  */
-class rwDocument{
+class readDocument{
 
     public function __construct(){
 
